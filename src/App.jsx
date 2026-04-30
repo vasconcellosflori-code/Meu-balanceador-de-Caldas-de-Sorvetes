@@ -1,28 +1,55 @@
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 
-const defaultIngredients = [
-  { id: 1, name: "Água", grams: 600, solids: 0, fat: 0, sugar: 0, pod: 0, pac: 0 },
-  { id: 2, name: "Açúcar", grams: 150, solids: 100, fat: 0, sugar: 100, pod: 100, pac: 100 },
-  { id: 3, name: "Leite", grams: 200, solids: 12, fat: 3, sugar: 5, pod: 5, pac: 5 }
+const baseIngredients = [
+  { id: 1, name: "Água filtrada", grams: 520, solids: 0, fat: 0, sugar: 0, snf: 0, pod: 0, pac: 0 },
+  { id: 2, name: "Açúcar cristal", grams: 120, solids: 100, fat: 0, sugar: 100, snf: 0, pod: 100, pac: 100 },
+  { id: 3, name: "Dextrose", grams: 45, solids: 92, fat: 0, sugar: 92, snf: 0, pod: 70, pac: 171 }
 ];
 
-function App(){
-  const [ingredients, setIngredients] = useState(defaultIngredients);
+const targets = {
+  solids: [36, 42],
+  fat: [5, 10],
+  pod: [14, 18],
+  pac: [20, 28]
+};
 
-  const totals = useMemo(()=>{
-    const total = ingredients.reduce((s,i)=>s+i.grams,0)||1;
-    const calc = (key)=>ingredients.reduce((s,i)=>s+i.grams*i[key]/100,0)/total*100;
+function format(n){ return Number(n || 0).toFixed(1); }
+
+function status(value, [min, max]){
+  if(value < min) return "Baixo";
+  if(value > max) return "Alto";
+  return "OK";
+}
+
+function App(){
+  const [ingredients, setIngredients] = useState(baseIngredients);
+
+  const totalGrams = useMemo(() => 
+    ingredients.reduce((sum, item) => sum + Number(item.grams || 0), 0),
+    [ingredients]
+  );
+
+  const totals = useMemo(() => {
+    const total = totalGrams || 1;
+    const calc = key => ingredients.reduce(
+      (sum, item) => sum + Number(item.grams || 0) * Number(item[key] || 0) / 100,
+      0
+    ) / total * 100;
+
     return {
       solids: calc("solids"),
       fat: calc("fat"),
       pod: calc("pod"),
       pac: calc("pac")
     };
-  },[ingredients]);
+  }, [ingredients, totalGrams]);
 
   function update(id, field, value){
-    setIngredients(rows=>rows.map(r=>r.id===id?{...r,[field]:Number(value)}:r));
+    setIngredients(rows => rows.map(row => row.id === id ? {
+      ...row,
+      [field]: Number(value)
+    } : row));
   }
 
   return (
@@ -44,13 +71,7 @@ function App(){
           {ingredients.map(i=> (
             <tr key={i.id}>
               <td>{i.name}</td>
-              <td>
-                <input
-                  type="number"
-                  value={i.grams}
-                  onChange={e=>update(i.id,"grams",e.target.value)}
-                />
-              </td>
+              <td><input type="number" value={i.grams} onChange={e=>update(i.id,"grams",e.target.value)} /></td>
               <td>{i.solids}</td>
               <td>{i.fat}</td>
               <td>{i.pod}</td>
@@ -61,10 +82,10 @@ function App(){
       </table>
 
       <h2>Resultados</h2>
-      <p>Sólidos: {totals.solids.toFixed(1)}%</p>
-      <p>Gordura: {totals.fat.toFixed(1)}%</p>
-      <p>POD: {totals.pod.toFixed(1)}</p>
-      <p>PAC: {totals.pac.toFixed(1)}</p>
+      <p>Sólidos: {format(totals.solids)}% ({status(totals.solids, targets.solids)})</p>
+      <p>Gordura: {format(totals.fat)}% ({status(totals.fat, targets.fat)})</p>
+      <p>POD: {format(totals.pod)}</p>
+      <p>PAC: {format(totals.pac)}</p>
     </div>
   );
 }
