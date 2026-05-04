@@ -14,11 +14,11 @@ const ingredientesIniciais = [
 ];
 
 const faixas = {
-  solidos: [36, 42],
+  solidos: [30, 40],
   gordura: [5, 10],
-  acucares: [16, 22],
+  acucares: [14, 20],
   sngl: [8, 12],
-  proteina: [3, 5],
+  proteina: [1,50, 5],
   lactose: [4, 7],
   estabilizante: [0.3, 0.8],
   pod: [14, 18],
