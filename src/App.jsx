@@ -302,17 +302,17 @@ function App() {
     const wb = XLSX.utils.book_new();
 
     const wsIngredientes = XLSX.utils.aoa_to_sheet([
-      ["Ingrediente","g","Custo/kg","Sólidos","Carboidratos","Açúcares totais","Açúcares adicionados","Gordura","Gordura saturada","Gordura trans","Proteína","Lactose","SNGL","Fibra","Sódio","Estabilizante","POD","PAC"],
+      ["Ingrediente", "g", "Custo/kg", "Sólidos", "Carboidratos", "Açúcares totais", "Açúcares adicionados", "Gordura", "Gordura saturada", "Gordura trans", "Proteína", "Lactose", "SNGL", "Fibra", "Sódio", "Estabilizante", "POD", "PAC"],
       ...linhasIngredientes
     ]);
 
     const wsResumo = XLSX.utils.aoa_to_sheet([
-      ["Indicador","Valor"],
+      ["Indicador", "Valor"],
       ...linhasResumo
     ]);
 
     const wsNutri = XLSX.utils.aoa_to_sheet([
-      ["Nutriente","100 g","Porção","%VD"],
+      ["Nutriente", "100 g", "Porção", "%VD"],
       ...linhasNutricionais
     ]);
 
@@ -321,30 +321,6 @@ function App() {
     XLSX.utils.book_append_sheet(wb, wsNutri, "Nutricional");
 
     XLSX.writeFile(wb, `${nomeReceita.replace(/[^a-z0-9]+/gi, "-")}.xlsx`);
-  } = gerarDadosExportacao();
-    const html = `
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-          <style>
-            body { font-family: Arial, sans-serif; }
-            h1 { color: #172033; }
-            h2 { margin-top: 24px; color: #172033; }
-            table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
-            th { background: #edf2f7; font-weight: bold; }
-            th, td { border: 1px solid #94a3b8; padding: 6px; text-align: left; }
-          </style>
-        </head>
-        <body>
-          <h1>${nomeReceita}</h1>
-          ${tabelaHtml("Receita", ["Ingrediente", "g", "Custo/kg", "Sólidos", "Carboidratos", "Açúcares totais", "Açúcares adicionados", "Gordura", "Gordura saturada", "Gordura trans", "Proteína", "Lactose", "SNGL", "Fibra", "Sódio", "Estabilizante", "POD", "PAC"], linhasIngredientes)}
-          ${tabelaHtml("Resumo industrial", ["Indicador", "Valor"], linhasResumo)}
-          ${tabelaHtml("Tabela nutricional estimada", ["Nutriente", "100 g", "Porção", "%VD"], linhasNutricionais)}
-        </body>
-      </html>
-    `;
-    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
-    baixarArquivo(blob, `${nomeReceita.replace(/[^a-z0-9]+/gi, "-")}.xls`);
   }
 
   function exportarPDF() {
