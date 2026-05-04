@@ -161,19 +161,124 @@ function App() {
     setMedidaCaseira("1 bola");
   }
 
+  function gerarDadosExportacao() {
+    const linhasIngredientes = ingredientes.map(i => [
+      i.nome, i.g, i.custoKg, i.solidos, i.carboidratos, i.acucares, i.acucaresAdicionados,
+      i.gordura, i.gorduraSaturada, i.gorduraTrans, i.proteina, i.lactose, i.sngl,
+      i.fibra, i.sodio, i.estabilizante, i.pod, i.pac
+    ]);
+
+    const linhasResumo = [
+      ["Peso total", `${fmt(pesoTotal)} g`],
+      ["Custo total", `R$ ${fmt(totais.custoTotal)}`],
+      ["Custo/kg calda", `R$ ${fmt(totais.custoKg)}`],
+      ["Custo/kg líquido", `R$ ${fmt(totais.custoKgLiquido)}`],
+      ["Rendimento líquido", `${fmt(totais.rendimentoLiquidoKg)} kg`],
+      ["Volume com overrun", `${fmt(totais.volumeFinalL)} L`],
+      ["Porção", `${porcao} g (${medidaCaseira})`]
+    ];
+
+    const linhasNutricionais = tabelaNutricional.map(i => [
+      i.nome,
+      `${i.unidade === "mg" ? arred(i.por100) : fmt(i.por100)} ${i.unidade}`,
+      `${i.unidade === "mg" ? arred(valorPorcao(i)) : fmt(valorPorcao(i))} ${i.unidade}`,
+      percentualVD(i)
+    ]);
+
+    return { linhasIngredientes, linhasResumo, linhasNutricionais };
+  }
+
   function exportarCSV() {
+    const { linhasIngredientes, linhasResumo, linhasNutricionais } = gerarDadosExportacao();
     const cabecalho = "Ingrediente;g;Custo/kg;Solidos;Carboidratos;Acucares totais;Acucares adicionados;Gordura;Gordura saturada;Gordura trans;Proteina;Lactose;SNGL;Fibra;Sodio;Estabilizante;POD;PAC";
-    const linhas = ingredientes.map(i => [i.nome, i.g, i.custoKg, i.solidos, i.carboidratos, i.acucares, i.acucaresAdicionados, i.gordura, i.gorduraSaturada, i.gorduraTrans, i.proteina, i.lactose, i.sngl, i.fibra, i.sodio, i.estabilizante, i.pod, i.pac].join(";"));
-    const nutri = tabelaNutricional.map(i => [i.nome, fmt(i.por100), fmt(valorPorcao(i)), percentualVD(i)].join(";"));
-    const resumo = ["", "RESUMO", `Peso total;${fmt(pesoTotal)} g`, `Custo total;R$ ${fmt(totais.custoTotal)}`, `Custo/kg;R$ ${fmt(totais.custoKg)}`, `Rendimento liquido;${fmt(totais.rendimentoLiquidoKg)} kg`, `Volume final;${fmt(totais.volumeFinalL)} L`, "", "TABELA NUTRICIONAL", `Porcao;${porcao} g (${medidaCaseira})`, "Nutriente;100 g;Porcao;%VD", ...nutri];
+    const linhas = linhasIngredientes.map(linha => linha.join(";"));
+    const resumo = ["", "RESUMO", ...linhasResumo.map(l => l.join(";")), "", "TABELA NUTRICIONAL", "Nutriente;100 g;Porcao;%VD", ...linhasNutricionais.map(l => l.join(";"))];
     const csv = [cabecalho, ...linhas, ...resumo].join(String.fromCharCode(10));
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    baixarArquivo(blob, `${nomeReceita.replace(/[^a-z0-9]+/gi, "-")}.csv`);
+  }
+
+  function baixarArquivo(blob, nomeArquivo) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${nomeReceita.replace(/[^a-z0-9]+/gi, "-")}.csv`;
+    a.download = nomeArquivo;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function tabelaHtml(titulo, cabecalhos, linhas) {
+    return `
+      <h2>${titulo}</h2>
+      <table>
+        <thead><tr>${cabecalhos.map(h => `<th>${h}</th>`).join("")}</tr></thead>
+        <tbody>${linhas.map(l => `<tr>${l.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>
+      </table>
+    `;
+  }
+
+  function exportarXLS() {
+    const { linhasIngredientes, linhasResumo, linhasNutricionais } = gerarDadosExportacao();
+    const html = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            body { font-family: Arial, sans-serif; }
+            h1 { color: #172033; }
+            h2 { margin-top: 24px; color: #172033; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
+            th { background: #edf2f7; font-weight: bold; }
+            th, td { border: 1px solid #94a3b8; padding: 6px; text-align: left; }
+          </style>
+        </head>
+        <body>
+          <h1>${nomeReceita}</h1>
+          ${tabelaHtml("Receita", ["Ingrediente", "g", "Custo/kg", "Sólidos", "Carboidratos", "Açúcares totais", "Açúcares adicionados", "Gordura", "Gordura saturada", "Gordura trans", "Proteína", "Lactose", "SNGL", "Fibra", "Sódio", "Estabilizante", "POD", "PAC"], linhasIngredientes)}
+          ${tabelaHtml("Resumo industrial", ["Indicador", "Valor"], linhasResumo)}
+          ${tabelaHtml("Tabela nutricional estimada", ["Nutriente", "100 g", "Porção", "%VD"], linhasNutricionais)}
+        </body>
+      </html>
+    `;
+    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+    baixarArquivo(blob, `${nomeReceita.replace(/[^a-z0-9]+/gi, "-")}.xls`);
+  }
+
+  function exportarPDF() {
+    const { linhasIngredientes, linhasResumo, linhasNutricionais } = gerarDadosExportacao();
+    const html = `
+      <html>
+        <head>
+          <title>${nomeReceita}</title>
+          <meta charset="UTF-8" />
+          <style>
+            @page { size: A4 landscape; margin: 12mm; }
+            body { font-family: Arial, sans-serif; color: #172033; }
+            h1 { margin: 0 0 6px; font-size: 24px; }
+            h2 { margin: 18px 0 8px; font-size: 16px; }
+            p { color: #526173; font-size: 12px; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 12px; font-size: 10px; }
+            th { background: #edf2f7; }
+            th, td { border: 1px solid #94a3b8; padding: 5px; text-align: left; }
+            .alerta { display: inline-block; background: #111827; color: #fff; padding: 8px 10px; border-radius: 8px; font-weight: bold; margin-bottom: 10px; }
+          </style>
+        </head>
+        <body>
+          <h1>${nomeReceita}</h1>
+          <p>Relatório gerado pelo Balanceador de Caldas. Porção: ${porcao} g (${medidaCaseira}).</p>
+          ${alertaFrontal.length > 0 ? `<div class="alerta">${alertaFrontal.join(" • ")}</div>` : ""}
+          ${tabelaHtml("Resumo industrial", ["Indicador", "Valor"], linhasResumo)}
+          ${tabelaHtml("Tabela nutricional estimada", ["Nutriente", "100 g", "Porção", "%VD"], linhasNutricionais)}
+          ${tabelaHtml("Receita", ["Ingrediente", "g", "Custo/kg", "Sólidos", "Carboidratos", "Açúcares totais", "Açúcares adicionados", "Gordura", "Gordura saturada", "Gordura trans", "Proteína", "Lactose", "SNGL", "Fibra", "Sódio", "Estabilizante", "POD", "PAC"], linhasIngredientes)}
+          <p>Observação: tabela nutricional estimada. Validar com ficha técnica, laudo ou software regulatório antes de impressão comercial.</p>
+          <script>window.onload = function(){ window.print(); };</script>
+        </body>
+      </html>
+    `;
+    const janela = window.open("", "_blank");
+    janela.document.open();
+    janela.document.write(html);
+    janela.document.close();
   }
 
   const alertaFrontal = [];
@@ -245,6 +350,8 @@ function App() {
               <button style={styles.button} onClick={() => escalarReceita(10000)}>10 kg</button>
               <button style={styles.buttonLight} onClick={resetar}>Reset</button>
               <button style={styles.primaryButton} onClick={exportarCSV}>Exportar CSV</button>
+              <button style={styles.primaryButton} onClick={exportarXLS}>Baixar XLS editável</button>
+              <button style={styles.primaryButton} onClick={exportarPDF}>Baixar PDF</button>
             </div>
           </div>
         </header>
