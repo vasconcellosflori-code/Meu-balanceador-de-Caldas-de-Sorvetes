@@ -107,6 +107,14 @@ function converterLinhaExcel(linha, index) {
   };
 }
 
+function lerReceitasSalvas() {
+  try {
+    return JSON.parse(localStorage.getItem("receitasBalanceadorCaldas") || "[]");
+  } catch {
+    return [];
+  }
+}
+
 function App() {
   const [nomeReceita, setNomeReceita] = useState("Base branca cremosa");
   const [ingredientes, setIngredientes] = useState(ingredientesIniciais);
@@ -115,6 +123,8 @@ function App() {
   const [loteDesejado, setLoteDesejado] = useState(10000);
   const [porcao, setPorcao] = useState(60);
   const [medidaCaseira, setMedidaCaseira] = useState("1 bola");
+  const [receitasSalvas, setReceitasSalvas] = useState(lerReceitasSalvas);
+  const [receitaSelecionada, setReceitaSelecionada] = useState("");
 
   const pesoTotal = useMemo(() => ingredientes.reduce((soma, item) => soma + num(item.g), 0), [ingredientes]);
 
@@ -205,6 +215,53 @@ function App() {
     setLoteDesejado(10000);
     setPorcao(60);
     setMedidaCaseira("1 bola");
+  }
+
+  function salvarReceitaNoNavegador() {
+    const novaReceita = {
+      id: Date.now(),
+      nome: nomeReceita || "Receita sem nome",
+      data: new Date().toLocaleString("pt-BR"),
+      ingredientes,
+      perdaProcesso,
+      overrun,
+      loteDesejado,
+      porcao,
+      medidaCaseira
+    };
+
+    const atualizadas = [novaReceita, ...receitasSalvas.filter(r => r.nome !== novaReceita.nome)].slice(0, 50);
+    localStorage.setItem("receitasBalanceadorCaldas", JSON.stringify(atualizadas));
+    setReceitasSalvas(atualizadas);
+    setReceitaSelecionada(String(novaReceita.id));
+    alert("Receita salva neste navegador.");
+  }
+
+  function carregarReceitaSalva() {
+    const receita = receitasSalvas.find(r => String(r.id) === String(receitaSelecionada));
+    if (!receita) {
+      alert("Selecione uma receita salva para carregar.");
+      return;
+    }
+
+    setNomeReceita(receita.nome);
+    setIngredientes(receita.ingredientes || ingredientesIniciais);
+    setPerdaProcesso(receita.perdaProcesso ?? 3);
+    setOverrun(receita.overrun ?? 35);
+    setLoteDesejado(receita.loteDesejado ?? 10000);
+    setPorcao(receita.porcao ?? 60);
+    setMedidaCaseira(receita.medidaCaseira ?? "1 bola");
+  }
+
+  function excluirReceitaSalva() {
+    if (!receitaSelecionada) {
+      alert("Selecione uma receita salva para excluir.");
+      return;
+    }
+    const atualizadas = receitasSalvas.filter(r => String(r.id) !== String(receitaSelecionada));
+    localStorage.setItem("receitasBalanceadorCaldas", JSON.stringify(atualizadas));
+    setReceitasSalvas(atualizadas);
+    setReceitaSelecionada("");
   }
 
   function importarExcel(event) {
@@ -428,6 +485,13 @@ function App() {
               <button style={styles.button} onClick={() => escalarReceita(5000)}>5 kg</button>
               <button style={styles.button} onClick={() => escalarReceita(10000)}>10 kg</button>
               <button style={styles.buttonLight} onClick={resetar}>Reset</button>
+              <button style={styles.saveButton} onClick={salvarReceitaNoNavegador}>Salvar receita</button>
+              <select style={styles.selectRecipe} value={receitaSelecionada} onChange={(e) => setReceitaSelecionada(e.target.value)}>
+                <option value="">Receitas salvas</option>
+                {receitasSalvas.map(r => <option key={r.id} value={r.id}>{r.nome} • {r.data}</option>)}
+              </select>
+              <button style={styles.button} onClick={carregarReceitaSalva}>Carregar</button>
+              <button style={styles.deleteSmallButton} onClick={excluirReceitaSalva}>Excluir salva</button>
               <label style={styles.uploadButton}>
                 Upload Excel
                 <input type="file" accept=".xlsx,.xls" onChange={importarExcel} style={{ display: "none" }} />
@@ -549,6 +613,9 @@ const styles = {
   buttonRow: { display: "flex", flexWrap: "wrap", gap: 8 },
   button: { background: "#eaf0f7", border: 0, borderRadius: 10, padding: "10px 13px", fontWeight: "bold", cursor: "pointer" },
   buttonLight: { background: "#fff3cd", border: 0, borderRadius: 10, padding: "10px 13px", fontWeight: "bold", cursor: "pointer" },
+  saveButton: { background: "#2563eb", color: "white", border: 0, borderRadius: 10, padding: "10px 13px", fontWeight: "bold", cursor: "pointer" },
+  selectRecipe: { background: "white", border: "1px solid #ccd6e3", borderRadius: 10, padding: "10px 12px", minWidth: 220, fontWeight: "bold", color: "#172033" },
+  deleteSmallButton: { background: "#fee2e2", color: "#991b1b", border: 0, borderRadius: 10, padding: "10px 13px", fontWeight: "bold", cursor: "pointer" },
   primaryButton: { background: "#172033", color: "white", border: 0, borderRadius: 10, padding: "11px 14px", fontWeight: "bold", cursor: "pointer" },
   uploadButton: { background: "#0f766e", color: "white", border: 0, borderRadius: 10, padding: "11px 14px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" },
   cards: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 20 },
