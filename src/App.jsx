@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import * as XLSX from "xlsx";
 
 const ingredientesIniciais = [
   { id: 1, nome: "Água filtrada", g: 520, custoKg: 0.01, solidos: 0, carboidratos: 0, acucares: 0, acucaresAdicionados: 0, gordura: 0, gorduraSaturada: 0, gorduraTrans: 0, proteina: 0, lactose: 0, sngl: 0, fibra: 0, sodio: 0, estabilizante: 0, pod: 0, pac: 0 },
@@ -59,6 +60,51 @@ function corStatus(valor, faixa) {
   if (s === "ok") return "#16a34a";
   if (s === "baixo") return "#f59e0b";
   return "#dc2626";
+}
+
+function normalizarTexto(texto) {
+  return String(texto || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+function pegarValor(linha, opcoes, padrao = 0) {
+  const chaves = Object.keys(linha);
+  for (const opcao of opcoes) {
+    const alvo = normalizarTexto(opcao);
+    const encontrada = chaves.find(chave => normalizarTexto(chave) === alvo);
+    if (encontrada !== undefined && linha[encontrada] !== undefined && linha[encontrada] !== "") {
+      return linha[encontrada];
+    }
+  }
+  return padrao;
+}
+
+function converterLinhaExcel(linha, index) {
+  return {
+    id: Date.now() + index,
+    nome: String(pegarValor(linha, ["Ingrediente", "Nome", "Produto", "Insumo"], `Ingrediente ${index + 1}`)),
+    g: Number(pegarValor(linha, ["g", "gramas", "quantidade", "peso", "peso g", "kg"], 0)),
+    custoKg: Number(pegarValor(linha, ["Custo/kg", "Custo kg", "CustoKg", "R$/kg", "Preco/kg", "Preço/kg"], 0)),
+    solidos: Number(pegarValor(linha, ["Sólidos %", "Solidos %", "Sólidos", "Solidos", "ST"], 0)),
+    carboidratos: Number(pegarValor(linha, ["Carboidratos %", "Carboidratos", "Carboidrato"], 0)),
+    acucares: Number(pegarValor(linha, ["Açúcares totais %", "Acucares totais %", "Açúcares", "Acucares", "Açúcar", "Acucar"], 0)),
+    acucaresAdicionados: Number(pegarValor(linha, ["Açúcares adicionados %", "Acucares adicionados %", "Açúcar adicionado", "Acucar adicionado"], 0)),
+    gordura: Number(pegarValor(linha, ["Gordura %", "Gordura", "Gorduras totais", "Gordura total"], 0)),
+    gorduraSaturada: Number(pegarValor(linha, ["Gord. saturada %", "Gordura saturada %", "Gordura saturada", "Gorduras saturadas"], 0)),
+    gorduraTrans: Number(pegarValor(linha, ["Gord. trans %", "Gordura trans %", "Gordura trans", "Gorduras trans"], 0)),
+    proteina: Number(pegarValor(linha, ["Proteína %", "Proteina %", "Proteína", "Proteina"], 0)),
+    lactose: Number(pegarValor(linha, ["Lactose %", "Lactose"], 0)),
+    sngl: Number(pegarValor(linha, ["SNGL %", "SNGL", "Sólidos não gordurosos do leite", "Solidos nao gordurosos do leite"], 0)),
+    fibra: Number(pegarValor(linha, ["Fibra %", "Fibra", "Fibras", "Fibras alimentares"], 0)),
+    sodio: Number(pegarValor(linha, ["Sódio mg/100g", "Sodio mg/100g", "Sódio", "Sodio"], 0)),
+    estabilizante: Number(pegarValor(linha, ["Estabilizante %", "Estabilizante", "Gomas", "Goma"], 0)),
+    pod: Number(pegarValor(linha, ["POD", "Dulçor", "Dulcor"], 0)),
+    pac: Number(pegarValor(linha, ["PAC", "AFP", "Poder anticongelante"], 0))
+  };
 }
 
 function App() {
@@ -159,6 +205,39 @@ function App() {
     setLoteDesejado(10000);
     setPorcao(60);
     setMedidaCaseira("1 bola");
+  }
+
+  function importarExcel(event) {
+    const arquivo = event.target.files && event.target.files[0];
+    if (!arquivo) return;
+
+    const leitor = new FileReader();
+    leitor.onload = (e) => {
+      try {
+        const dados = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(dados, { type: "array" });
+        const primeiraAba = workbook.SheetNames[0];
+        const planilha = workbook.Sheets[primeiraAba];
+        const linhas = XLSX.utils.sheet_to_json(planilha, { defval: "" });
+
+        const ingredientesImportados = linhas
+          .map((linha, index) => converterLinhaExcel(linha, index))
+          .filter(item => item.nome && item.nome !== "Ingrediente" && num(item.g) > 0);
+
+        if (ingredientesImportados.length === 0) {
+          alert("Não encontrei ingredientes válidos. Confira se a planilha tem colunas como Ingrediente e g.");
+          return;
+        }
+
+        setIngredientes(ingredientesImportados);
+        setNomeReceita(arquivo.name.replace(/\.(xlsx|xls|csv)$/i, ""));
+      } catch (erro) {
+        alert("Erro ao importar a planilha. Verifique se o arquivo está em formato .xlsx ou .xls.");
+      }
+    };
+
+    leitor.readAsArrayBuffer(arquivo);
+    event.target.value = "";
   }
 
   function gerarDadosExportacao() {
@@ -349,6 +428,10 @@ function App() {
               <button style={styles.button} onClick={() => escalarReceita(5000)}>5 kg</button>
               <button style={styles.button} onClick={() => escalarReceita(10000)}>10 kg</button>
               <button style={styles.buttonLight} onClick={resetar}>Reset</button>
+              <label style={styles.uploadButton}>
+                Upload Excel
+                <input type="file" accept=".xlsx,.xls" onChange={importarExcel} style={{ display: "none" }} />
+              </label>
               <button style={styles.primaryButton} onClick={exportarCSV}>Exportar CSV</button>
               <button style={styles.primaryButton} onClick={exportarXLS}>Baixar XLS editável</button>
               <button style={styles.primaryButton} onClick={exportarPDF}>Baixar PDF</button>
@@ -467,6 +550,7 @@ const styles = {
   button: { background: "#eaf0f7", border: 0, borderRadius: 10, padding: "10px 13px", fontWeight: "bold", cursor: "pointer" },
   buttonLight: { background: "#fff3cd", border: 0, borderRadius: 10, padding: "10px 13px", fontWeight: "bold", cursor: "pointer" },
   primaryButton: { background: "#172033", color: "white", border: 0, borderRadius: 10, padding: "11px 14px", fontWeight: "bold", cursor: "pointer" },
+  uploadButton: { background: "#0f766e", color: "white", border: 0, borderRadius: 10, padding: "11px 14px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" },
   cards: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 20 },
   card: { background: "white", border: "1px solid #dce4ef", borderRadius: 18, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,.04)" },
   cardTitle: { color: "#526173", fontSize: 14 },
