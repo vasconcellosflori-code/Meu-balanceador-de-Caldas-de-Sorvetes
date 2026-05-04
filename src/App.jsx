@@ -298,6 +298,30 @@ function App() {
 
   function exportarXLS() {
     const { linhasIngredientes, linhasResumo, linhasNutricionais } = gerarDadosExportacao();
+
+    const wb = XLSX.utils.book_new();
+
+    const wsIngredientes = XLSX.utils.aoa_to_sheet([
+      ["Ingrediente","g","Custo/kg","Sólidos","Carboidratos","Açúcares totais","Açúcares adicionados","Gordura","Gordura saturada","Gordura trans","Proteína","Lactose","SNGL","Fibra","Sódio","Estabilizante","POD","PAC"],
+      ...linhasIngredientes
+    ]);
+
+    const wsResumo = XLSX.utils.aoa_to_sheet([
+      ["Indicador","Valor"],
+      ...linhasResumo
+    ]);
+
+    const wsNutri = XLSX.utils.aoa_to_sheet([
+      ["Nutriente","100 g","Porção","%VD"],
+      ...linhasNutricionais
+    ]);
+
+    XLSX.utils.book_append_sheet(wb, wsIngredientes, "Receita");
+    XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo");
+    XLSX.utils.book_append_sheet(wb, wsNutri, "Nutricional");
+
+    XLSX.writeFile(wb, `${nomeReceita.replace(/[^a-z0-9]+/gi, "-")}.xlsx`);
+  } = gerarDadosExportacao();
     const html = `
       <html>
         <head>
